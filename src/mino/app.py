@@ -1,9 +1,9 @@
-import sys,imp
+import sys
 import logging
 
 from functools import partial
 import tornado.ioloop
-from tornado.web import RequestHandler
+from tornado.web import RequestHandler,StaticFileHandler
 from tornado.options import define,options,parse_command_line
 
 class urlhandler_partial:
@@ -15,9 +15,12 @@ class urlhandler_partial:
     def __call__(self,req):
         self._func(req,*self._args)
 
-def load_module(name,folder):
+def load_module(name,folder,imp):
     args=imp.find_module(name,[folder])
-    return imp.load_module('mino.%s'%name,*args)
+    if isinstance(args,tuple):
+        return imp.load_module('mino.%s'%name,*args)
+    else:
+        return imp.load_module(name)
 
 def load_logfiles(logfiles):
     for name,filename in logfiles.items():
@@ -25,6 +28,12 @@ def load_logfiles(logfiles):
         log_formatter=logging.Formatter('%(asctime)s %(message)s',datefmt='%Y-%m-%d %H:%M:%S')
         log_handler.setFormatter(log_formatter)
         logging.getLogger(name).addHandler(log_handler)
+
+def load_staticpaths(staticpaths):
+    handlers=[]
+    for url,path in staticpaths:
+        handlers.append((url,StaticFileHandler,{'path':path}))
+    return handlers
 
 def load_urlpatterns(urlpatterns):
     handlers=[]
@@ -64,14 +73,15 @@ def urlhandler_init_function(self,*args,**kwargs):
     for name,fn in self._proxyfuncs.items():
         setattr(self,name,partial(fn,self))
 
-def start_server(root):
+def start_server(root,imp):
     # load config file
-    conf=load_module('conf',root)
+    conf=load_module('conf',root,imp)
     # initialize logfiles
     load_logfiles(conf.app_logfiles)
     # initialize url patterns
-    urls=load_module('urls',root)
+    urls=load_module('urls',root,imp)
     urlhandlers=load_urlpatterns(urls.urlpatterns)
+    urlhandlers+=load_staticpaths(conf.app_staticpaths)
     # build appliation object
     application=tornado.web.Application(urlhandlers,**conf.app_settings)
     # build options and parse command line
