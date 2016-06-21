@@ -31,7 +31,7 @@ def load_logfiles(logfiles):
 
 def load_staticpaths(staticpaths):
     handlers=[]
-    for url,path in staticpaths:
+    for url,path in staticpaths.items():
         handlers.append((url,StaticFileHandler,{'path':path}))
     return handlers
 
@@ -89,6 +89,6 @@ def start_server(root,imp):
         define(name,**args)
     parse_command_line()
     # start server loop
-    logging.info('Mino ( based on Tornado ) Running!')
+    logging.getLogger('mino').info('Mino ( based on Tornado ) Running @ Port %d!'%(options.port))
     application.listen(options.port)
     tornado.ioloop.IOLoop.current().start()

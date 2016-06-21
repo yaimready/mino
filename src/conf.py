@@ -20,11 +20,12 @@ log_path=lambda f:os.path.join(pypath,'logs',f)
 app_logfiles={
     'tornado.general':log_path('tornado_general.log'),
     'tornado.application':log_path('tornado_application.log'),
-    'tornado.access':log_path('tornado_access.log')
+    'tornado.access':log_path('tornado_access.log'),
+    'mino':log_path('mino.log')
 }
 
 js_path=os.path.abspath(os.path.join(pypath,'static/js'))
 
-app_staticpaths=[
-    ('/static/js/(.*)',js_path),
-]
+app_staticpaths={
+    '/static/js/(.*)':js_path,
+}
