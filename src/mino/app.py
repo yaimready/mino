@@ -12,7 +12,8 @@ class urlhandler_partial:
         self._func=func
         self._args=args
         
-    def __call__(self,req):
+    def __call__(self,req,*args):
+        print(self,args)
         self._func(req,*self._args)
 
 def load_module(name,folder,imp):
@@ -37,35 +38,38 @@ def load_staticpaths(staticpaths):
 
 def load_urlpatterns(urlpatterns):
     handlers=[]
-    proxyfunc_map={}
+    proxy_map={}
     overloads=[
         'initialize','prepare','on_finish',
         'get','head','post','delete',
         'patch','put','options'
         ]
+    sn=0
     for urlpattern in urlpatterns:
         url,urlhandler=urlpattern[:2]
         proxyname=str(urlhandler)
-        if proxyname in proxyfunc_map:
-            proxyfuncs=proxyfunc_map[proxyname]
-        else:
-            if isinstance(urlhandler,type):
-                proxyfuncs={}
-                proxy=urlhandler(*urlpattern[2:])
-                for k in overloads:
-                    fn=getattr(proxy,k,None)
-                    if fn: proxyfuncs[k]=fn
-            elif callable(urlhandler):
-                proxy=urlhandler_partial(urlhandler,*urlpattern[2:])
-                proxyfuncs={'get':proxy,'post':proxy}
+        if isinstance(urlhandler,type):
+            proxyfuncs={}
+            if proxyname in proxy_map:
+                proxy=proxy_map[proxyname]
             else:
-                raise Exception('urlhandler for [%s] is not function or type'%url)
-            proxyfunc_map[proxyname]=proxyfuncs
-        UrlHandler=type('UrlHandler_%s'%(urlhandler.__name__),(RequestHandler,),{
+                proxy=urlhandler()
+                proxy_map[proxyname]=proxy
+            for k in overloads:
+                fn=getattr(proxy,k,None)
+                if fn:
+                    proxyfuncs[k]=urlhandler_partial(fn,*urlpattern[2:])
+        elif callable(urlhandler):
+            proxy=urlhandler_partial(urlhandler,*urlpattern[2:])
+            proxyfuncs={'get':proxy,'post':proxy}
+        else:
+            raise Exception('urlhandler for [%s] is not function or type'%url)
+        UrlHandler=type('UrlHandler_%d'%sn,(RequestHandler,),{
             '__init__':urlhandler_init_function,
             '_proxyfuncs':proxyfuncs
         })
         handlers.append((url,UrlHandler))
+        sn+=1
     return handlers
 
 def urlhandler_init_function(self,*args,**kwargs):
