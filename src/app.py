@@ -3,7 +3,7 @@ import sys
 sys.dont_write_bytecode=True
 
 import os
-from mino import app
+import mino
 
 if hasattr(sys, 'frozen'):
   pypath = os.path.dirname(sys.executable)
@@ -14,4 +14,4 @@ else:
   pypath = os.path.dirname(__file__)
   import imp
   
-app.start_server(pypath,imp)
+mino.start_server(pypath,imp)

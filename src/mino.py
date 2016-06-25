@@ -1,3 +1,4 @@
+import os
 import sys
 import logging
 
@@ -13,7 +14,6 @@ class urlhandler_partial:
         self._args=args
         
     def __call__(self,req,*args):
-        print(self,args)
         self._func(req,*self._args)
 
 def load_module(name,folder,imp):
@@ -25,10 +25,14 @@ def load_module(name,folder,imp):
 
 def load_logfiles(logfiles):
     for name,filename in logfiles.items():
-        log_handler=logging.FileHandler(filename)
-        log_formatter=logging.Formatter('%(asctime)s %(message)s',datefmt='%Y-%m-%d %H:%M:%S')
-        log_handler.setFormatter(log_formatter)
-        logging.getLogger(name).addHandler(log_handler)
+        log_dir=os.path.dirname(filename)
+        if os.path.isdir(log_dir):
+            log_handler=logging.FileHandler(filename)
+            log_formatter=logging.Formatter('%(asctime)s %(message)s',datefmt='%Y-%m-%d %H:%M:%S')
+            log_handler.setFormatter(log_formatter)
+            logging.getLogger(name).addHandler(log_handler)
+        else:
+            logging.getLogger('mino').info('logger [%s] missing dir [%s] , ignored'%(name,log_dir))
 
 def load_staticpaths(staticpaths):
     handlers=[]
@@ -77,9 +81,27 @@ def urlhandler_init_function(self,*args,**kwargs):
     for name,fn in self._proxyfuncs.items():
         setattr(self,name,partial(fn,self))
 
-def start_server(root,imp):
+def start_server(root,imp,**server_options):
     # load config file
     conf=load_module('conf',root,imp)
+    # load server options
+    for name in server_options:
+        option=conf.app_options.get(name,None)
+        if option is None:
+            conf.app_options[name]={
+                'default':server_options[name]
+            }
+        else:
+            if 'default' in option:
+                option['default']=server_options[name]
+    for name,args in conf.app_options.items():
+        define(name,**args)
+    # prepare useful options
+    argv=['mino']
+    for arg in sys.argv[1:]:
+        if arg.startswith('--'):
+            argv.append(arg)
+    parse_command_line(argv)
     # initialize logfiles
     load_logfiles(conf.app_logfiles)
     # initialize url patterns
@@ -88,10 +110,6 @@ def start_server(root,imp):
     urlhandlers+=load_staticpaths(conf.app_staticpaths)
     # build appliation object
     application=tornado.web.Application(urlhandlers,**conf.app_settings)
-    # build options and parse command line
-    for name,args in conf.app_options.items():
-        define(name,**args)
-    parse_command_line()
     # start server loop
     logging.getLogger('mino').info('Mino ( based on Tornado ) Running @ Port %d!'%(options.port))
     application.listen(options.port)
